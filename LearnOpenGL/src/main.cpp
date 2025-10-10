@@ -1,17 +1,22 @@
 #include <iostream>
-#include <glad/glad.h>
+#include <Glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "Shader.h"
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "Camera.h"
-#include <ft2build.h>
-#include FT_FREETYPE_H
+//#include <ft2build.h>
+//#include FT_FREETYPE_H
 #include <map>
 #include <string>
+
+#include <imgui.h>
+#include <imgui_internal.h>
+
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 
 // Author Kerem Karamanlioglu
 
@@ -22,16 +27,17 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void SetDarkThemeColors();
 
-// text rendering structure
-struct Character {
-	unsigned int TextureID;  // ID handle of the glyph texture
-	glm::ivec2   Size;       // Size of glyph
-	glm::ivec2   Bearing;    // Offset from baseline to left/top of glyph
-	unsigned int Advance;    // Offset to advance to next glyph
-};
+//// text rendering structure
+//struct Character {
+//	unsigned int TextureID;  // ID handle of the glyph texture
+//	glm::ivec2   Size;       // Size of glyph
+//	glm::ivec2   Bearing;    // Offset from baseline to left/top of glyph
+//	unsigned int Advance;    // Offset to advance to next glyph
+//};
 
-std::map<GLchar, Character> Characters;
+//std::map<GLchar, Character> Characters;
 unsigned int VAO2, VBO2;
 
 void RenderText(Shader& s, std::string text, float x, float y, float scale, glm::vec3 color);
@@ -39,7 +45,8 @@ void RenderText(Shader& s, std::string text, float x, float y, float scale, glm:
 float mixPercent = 0.2f;
 
 // camera
-Camera camera = Camera(glm::vec3(1, 1, 4));
+Camera camera;
+bool updateCamera = true;
 // mouse
 
 float lastX = SCREEN_WIDTH / 2;
@@ -88,65 +95,65 @@ int main()
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 
-	// text rendering stuff
-	FT_Library ft;
-	if (FT_Init_FreeType(&ft))
-	{
-		std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
-		return -1;
-	}
+	//// text rendering stuff
+	//FT_Library ft;
+	//if (FT_Init_FreeType(&ft))
+	//{
+	//	std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
+	//	return -1;
+	//}
 
-	FT_Face face;
-	if (FT_New_Face(ft, "fonts/arial.ttf", 0, &face))
-	{
-		std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
-		return -1;
-	}
-	FT_Set_Pixel_Sizes(face, 0, 48);  // height of the font will be 48px and width will be determined based on that
+	//FT_Face face;
+	//if (FT_New_Face(ft, "fonts/arial.ttf", 0, &face))
+	//{
+	//	std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
+	//	return -1;
+	//}
+	//FT_Set_Pixel_Sizes(face, 0, 48);  // height of the font will be 48px and width will be determined based on that
 
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // disable byte-alignment restriction since the texture that is created is 8-bit (1 byte)
+	//glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // disable byte-alignment restriction since the texture that is created is 8-bit (1 byte)
 
-	for (unsigned char c = 0; c < 128; c++)
-	{
-		// load character glyph 
-		if (FT_Load_Char(face, c, FT_LOAD_RENDER))
-		{
-			std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
-			continue;
-		}
-		// generate texture
-		unsigned int texture;
-		glGenTextures(1, &texture);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glTexImage2D(
-			GL_TEXTURE_2D,
-			0,
-			GL_RED,
-			face->glyph->bitmap.width,
-			face->glyph->bitmap.rows,
-			0,
-			GL_RED,
-			GL_UNSIGNED_BYTE,
-			face->glyph->bitmap.buffer
-		);
-		// set texture options
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		// now store character for later use
-		Character character = {
-			texture,
-			glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
-			glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-			static_cast<unsigned int>(face->glyph->advance.x)
-		};
-		Characters.insert(std::pair<char, Character>(c, character));
-	}
-	glBindTexture(GL_TEXTURE_2D, 0);
-	// clear resources  
-	FT_Done_Face(face);
-	FT_Done_FreeType(ft);
+	//for (unsigned char c = 0; c < 128; c++)
+	//{
+	//	// load character glyph 
+	//	if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+	//	{
+	//		std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
+	//		continue;
+	//	}
+	//	// generate texture
+	//	unsigned int texture;
+	//	glGenTextures(1, &texture);
+	//	glBindTexture(GL_TEXTURE_2D, texture);
+	//	glTexImage2D(
+	//		GL_TEXTURE_2D,
+	//		0,
+	//		GL_RED,
+	//		face->glyph->bitmap.width,
+	//		face->glyph->bitmap.rows,
+	//		0,
+	//		GL_RED,
+	//		GL_UNSIGNED_BYTE,
+	//		face->glyph->bitmap.buffer
+	//	);
+	//	// set texture options
+	//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//	// now store character for later use
+	//	Character character = {
+	//		texture,
+	//		glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+	//		glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+	//		static_cast<unsigned int>(face->glyph->advance.x)
+	//	};
+	//	Characters.insert(std::pair<char, Character>(c, character));
+	//}
+	//glBindTexture(GL_TEXTURE_2D, 0);
+	//// clear resources  
+	//FT_Done_Face(face);
+	//FT_Done_FreeType(ft);
 
 	glDisable(GL_BLEND);
 	glDisable(GL_CULL_FACE);
@@ -293,18 +300,18 @@ int main()
 	// uncomment this call to draw in wire frame polygons.
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-	const char* cubeObjectVShaderFile = "triangle_vert.glsl";
-	const char* cubeObjectFShaderFile = "triangle_frag.glsl";
+	const char* cubeObjectVShaderFile = "LearnOpenGL/assets/shaders/triangle_vert.glsl";
+	const char* cubeObjectFShaderFile = "LearnOpenGL/assets/shaders/triangle_frag.glsl";
 
-	const char* lightObjectVShader = "lighting_vert.glsl";
-	const char* lightObjectFShader = "lighting_frag.glsl";
+	const char* lightObjectVShader = "LearnOpenGL/assets/shaders/lighting_vert.glsl";
+	const char* lightObjectFShader = "LearnOpenGL/assets/shaders/lighting_frag.glsl";
 
-	const char* textVShader = "text_vert.glsl";
-	const char* textFShader = "text_frag.glsl";
+	/*const char* textVShader = "text_vert.glsl";
+	const char* textFShader = "text_frag.glsl";*/
 
 	Shader cubeObjectShader(cubeObjectVShaderFile, cubeObjectFShaderFile);
 	Shader lightObjectShader(lightObjectVShader, lightObjectFShader);
-	Shader textShader(textVShader, textFShader);
+	//Shader textShader(textVShader, textFShader);
 
 	// textures
 
@@ -367,13 +374,61 @@ int main()
 	//shader.setInt("texture2", 1);
 
 	glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(SCREEN_WIDTH), 0.0f, static_cast<float>(SCREEN_HEIGHT));
-	textShader.use();
-	textShader.setMat4("projection", projection);
+	/*textShader.use();
+	textShader.setMat4("projection", projection);*/
 
-	glm::vec3 lightColor = { 1.0f, 1.0f, 1.0f };
-	glm::vec3 lightPos = { 1.2f, 1.0f, 2.0f };
+	// imgui setup
+
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+	//io.ConfigViewportsNoAutoMerge = true;
+	//io.ConfigViewportsNoTaskBarIcon = true;
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsLight();
+
+
+	float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
+	// Setup scaling
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
+	style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
+#if GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 3
+	io.ConfigDpiScaleFonts = true;          // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
+	io.ConfigDpiScaleViewports = true;      // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
+#endif
+
+	// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		style.WindowRounding = 0.0f;
+		style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+	}
+
+	// Setup Platform/Renderer backends
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init("#version 330 core");
+
+	SetDarkThemeColors();
+
+
+	// imgui settings
+	static float lightScale = 0.6f;
+	static float objectScale = 1.0f;
+	float clearColor[3] = { 0.2f, 0.3f, 0.3f };
+
+	float lightColor[3] = { 1.0f, 1.0f, 1.0f };
+	float lightPos[3] = { 1.2f, 1.0f, 2.0f };
 	
 
+	float objectColor[3] = { 0.5f, 1.0f, 0.31f };
 
 	// glm::mat4 view;
 	// view = glm::lookAt(cameraPos, cameraTarget, up);
@@ -413,20 +468,49 @@ int main()
 		lightPos.y = sin(currentTime) * radius;
 		lightPos.z = sin(currentTime) * radius;*/
 
+		if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
+			updateCamera = false;
+		else
+			updateCamera = true;
+		
+
+
+		// Start the Dear ImGui frame
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::Begin("settings");
+
+		ImGui::ColorPicker3("Cube Color", objectColor);
+		ImGui::SliderFloat("Cube Scale", &objectScale, 0.1f, 3.0f);
+
+		ImGui::ColorPicker3("Light Color", lightColor);
+		ImGui::SliderFloat3("Light Position", lightPos, -10.0f, 10.0f);
+		ImGui::SliderFloat("Light Scale", &lightScale, 0.1f, 2.0f);
+
+		ImGui::ColorPicker3("Clear Color", clearColor);
+
+
+		ImGui::End();
+
+		glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.0f);
+
 		glm::mat4 view(1.0f);
 		view = camera.GetViewMatrix();
 
 		// projection matrix
 		glm::mat4 proj(1.0f);
-		proj = glm::perspective(glm::radians(camera._zoom), static_cast<float>(static_cast<float>(SCREEN_WIDTH) / static_cast<float>(SCREEN_HEIGHT)), 0.1f, 100.0f);
+		proj = glm::perspective(glm::radians(camera.m_Settings.Fov), static_cast<float>(static_cast<float>(SCREEN_WIDTH) / static_cast<float>(SCREEN_HEIGHT)), 0.1f, 100.0f);
 		
 		// model matrix
 		glm::mat4 model(1.0f);
 		model = glm::rotate(model, static_cast<float>(glfwGetTime()), glm::vec3(1.0f, 1.0f, 1.0f));
-		cubeObjectShader.setVec3("lightPos", lightPos);
-		cubeObjectShader.setVec3("lightColor", lightColor);
-		cubeObjectShader.setVec3("objectColor", {0.5f, 1.0f, 0.31f});
-		cubeObjectShader.setVec3("viewPos", camera._position);
+		model = glm::scale(model, glm::vec3(objectScale));
+		cubeObjectShader.setVec3("lightPos", glm::make_vec3(lightPos));
+		cubeObjectShader.setVec3("lightColor", glm::make_vec3(lightColor));
+		cubeObjectShader.setVec3("objectColor", glm::make_vec3(objectColor));
+		cubeObjectShader.setVec3("viewPos", camera.m_Settings.Position);
 		cubeObjectShader.setMat4("model", model);
 		cubeObjectShader.setMat4("view", view);
 		cubeObjectShader.setMat4("proj", proj);
@@ -435,14 +519,33 @@ int main()
 		// also draw the lamp object
 		lightObjectShader.use();
 		model = glm::mat4(1.0f);
-		model = glm::translate(model, lightPos);
-		model = glm::scale(model, glm::vec3(0.6f));
-		lightObjectShader.setVec3("lightPos", lightPos);
-		lightObjectShader.setVec3("lightColor", lightColor);
+		model = glm::translate(model, glm::make_vec3(lightPos));
+		model = glm::scale(model, glm::vec3(lightScale));
+		lightObjectShader.setVec3("lightPos", glm::make_vec3(lightPos));
+		lightObjectShader.setVec3("lightColor", glm::make_vec3(lightColor));
 		lightObjectShader.setMat4("model", model);
 		lightObjectShader.setMat4("proj", proj);
 		lightObjectShader.setMat4("view", view);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+		// ImGui Rendering
+		ImGuiIO& io = ImGui::GetIO();
+		io.DisplaySize = ImVec2(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+		// Rendering
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+		// Update and Render additional Platform Windows
+		// (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
+		//  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			GLFWwindow* backup_current_context = glfwGetCurrentContext();
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
+			glfwMakeContextCurrent(backup_current_context);
+		}
 
 		// transformation matrix
 		/*glm::mat4 trans = glm::mat4(1.0f);
@@ -480,12 +583,19 @@ int main()
 		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		// 
 		//  Render the text
-		RenderText(textShader, "Camera Position: " + Util::vector_to_string(camera._position), 25.0f, 25.0f, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+		//RenderText(textShader, "Camera Position: " + Util::vector_to_string(camera._position), 25.0f, 25.0f, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
 		
 		// check and call events and swap buffers
+
+
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
+
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
@@ -498,8 +608,12 @@ bool line = false;
 
 void processInput(GLFWwindow* window)
 {
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-		glfwSetWindowShouldClose(window, true);
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemHovered())
+	{
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	}
 	else if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
 		if (line)
 		{
@@ -511,7 +625,8 @@ void processInput(GLFWwindow* window)
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 			line = true;
 		}
-	else if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+	if (updateCamera)
+	{if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
 		mixPercent = std::min(1.0f, mixPercent + 0.0001f);
 	else if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
 		mixPercent = std::max(0.0f, mixPercent - 0.0001f);
@@ -529,56 +644,57 @@ void processInput(GLFWwindow* window)
 		camera.ProcessKeyboard(Camera_Movement::DOWNWARD, deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_R))
 		camera.Reset();
+	}
 	
 }
 
-void RenderText(Shader& s, std::string text, float x, float y, float scale, glm::vec3 color)
-{
-	// activate corresponding shader
-	s.use();
-	s.setVec3("textColor", color);
-	glActiveTexture(GL_TEXTURE0);
-	glBindVertexArray(VAO2);
-	glEnable(GL_BLEND);
-	glEnable(GL_CULL_FACE);
-
-	// iretate through all characters
-	std::string::const_iterator c;
-	for (c = text.begin(); c != text.end(); ++c)
-	{
-		Character ch = Characters[*c];
-
-		float xpos = x + ch.Bearing.x * scale;
-		float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
-
-		float w = ch.Size.x * scale;
-		float h = ch.Size.y * scale;
-		// update VBO for each chracter
-		float vertices[6][4] = {
-			{xpos, ypos + h, 0.0f, 0.0f},
-			{xpos, ypos, 0.0f, 1.0f},
-			{xpos + w, ypos, 1.0f, 1.0f},
-
-			{xpos, ypos + h, 0.0f, 0.0f},
-			{xpos + w, ypos, 1.0f, 1.0f},
-			{xpos + w, ypos + h, 1.0f, 0.0f}
-		};
-		// render the glyph texture over quad
-		glBindTexture(GL_TEXTURE_2D, ch.TextureID);
-		// update the content of the VBO memory
-		glBindBuffer(GL_ARRAY_BUFFER, VBO2);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		// render quad
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-		x += (ch.Advance >> 6) * scale; // bit shift by 6 to get value in pixels (2^6 = 64)
-	}
-	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glDisable(GL_BLEND);
-	glDisable(GL_CULL_FACE);
-}
+//void RenderText(Shader& s, std::string text, float x, float y, float scale, glm::vec3 color)
+//{
+//	// activate corresponding shader
+//	s.use();
+//	s.setVec3("textColor", color);
+//	glActiveTexture(GL_TEXTURE0);
+//	glBindVertexArray(VAO2);
+//	glEnable(GL_BLEND);
+//	glEnable(GL_CULL_FACE);
+//
+//	// iretate through all characters
+//	std::string::const_iterator c;
+//	for (c = text.begin(); c != text.end(); ++c)
+//	{
+//		Character ch = Characters[*c];
+//
+//		float xpos = x + ch.Bearing.x * scale;
+//		float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+//
+//		float w = ch.Size.x * scale;
+//		float h = ch.Size.y * scale;
+//		// update VBO for each chracter
+//		float vertices[6][4] = {
+//			{xpos, ypos + h, 0.0f, 0.0f},
+//			{xpos, ypos, 0.0f, 1.0f},
+//			{xpos + w, ypos, 1.0f, 1.0f},
+//
+//			{xpos, ypos + h, 0.0f, 0.0f},
+//			{xpos + w, ypos, 1.0f, 1.0f},
+//			{xpos + w, ypos + h, 1.0f, 0.0f}
+//		};
+//		// render the glyph texture over quad
+//		glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+//		// update the content of the VBO memory
+//		glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+//		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+//		glBindBuffer(GL_ARRAY_BUFFER, 0);
+//		// render quad
+//		glDrawArrays(GL_TRIANGLES, 0, 6);
+//		// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+//		x += (ch.Advance >> 6) * scale; // bit shift by 6 to get value in pixels (2^6 = 64)
+//	}
+//	glBindVertexArray(0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glDisable(GL_BLEND);
+//	glDisable(GL_CULL_FACE);
+//}
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
@@ -588,17 +704,52 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		lastY = ypos;
 		firstMouse = false;
 	}
-	camera.ProcessMouseMovement(xpos - lastX, lastY - ypos);
+	if (updateCamera)
+		camera.ProcessMouseMovement(xpos - lastX, lastY - ypos);
 	lastX = xpos;
 	lastY = ypos;
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	camera.ProcessMouseScroll(xoffset, static_cast<float>(yoffset));
+	if (updateCamera)
+		camera.ProcessMouseScroll(xoffset, static_cast<float>(yoffset));
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	glViewport(0, 0, width, height);
+}
+
+void SetDarkThemeColors()
+{
+	auto& colors = ImGui::GetStyle().Colors;
+	colors[ImGuiCol_WindowBg] = ImVec4{ 0.1f, 0.105f, 0.11f, 1.0f };
+
+	// Headers
+	colors[ImGuiCol_Header] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+	colors[ImGuiCol_HeaderHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
+	colors[ImGuiCol_HeaderActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+	// Buttons
+	colors[ImGuiCol_Button] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+	colors[ImGuiCol_ButtonHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
+	colors[ImGuiCol_ButtonActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+	// Frame BG
+	colors[ImGuiCol_FrameBg] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+	colors[ImGuiCol_FrameBgHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
+	colors[ImGuiCol_FrameBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+
+	// Tabs
+	colors[ImGuiCol_Tab] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+	colors[ImGuiCol_TabHovered] = ImVec4{ 0.38f, 0.3805f, 0.381f, 1.0f };
+	colors[ImGuiCol_TabActive] = ImVec4{ 0.28f, 0.2805f, 0.281f, 1.0f };
+	colors[ImGuiCol_TabUnfocused] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+	colors[ImGuiCol_TabUnfocusedActive] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+
+	// Title
+	colors[ImGuiCol_TitleBg] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+	colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+	colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
 }
