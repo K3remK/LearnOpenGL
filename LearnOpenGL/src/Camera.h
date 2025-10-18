@@ -6,18 +6,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Utils.h"
 
-enum Camera_Movement {
-	FORWARD,
-	BACKWARD,
-	UPWARD,
-	DOWNWARD,
-	LEFT,
-	RIGHT
-};
+#include "Events/KeyEvent.hpp"
+#include "Events/MouseEvent.hpp"
+#include "Events/ApplicationEvent.hpp"
 
 constexpr float YAW = -90.0f;
 constexpr float PITCH = 0.0f;
-constexpr float SPEED = 1.5f;
+constexpr float SPEED = 2.5f;
 constexpr float SENSITIVITY = 0.1f;
 constexpr float FOV = 45.0f;
 
@@ -28,6 +23,9 @@ struct CameraSettings
 	glm::vec3 Up = { 0.0f, 1.0f, 0.0f };
 	glm::vec3 Right;
 	glm::vec3 WorldUp = { 0.0f, 1.0f, 0.0f };
+
+	float NearClip = 0.1f;
+	float FarClip = 100.0f;
 
 	float MovementSpeed = SPEED;
 	float MouseSensitivity = SENSITIVITY;
@@ -40,85 +38,39 @@ struct CameraSettings
 class Camera
 {
 public:
-	Camera(const CameraSettings& settings)
-		: m_Settings(settings)
-	{
-		UpdateCameraVectors();
-	}
+	Camera(const CameraSettings& settings = CameraSettings());
 
-	Camera()
-	{
-		m_Settings = CameraSettings();
-		UpdateCameraVectors();
-	}
+	inline float GetNearClip() const { return m_Settings.NearClip; }
+	inline float GetFarClip() const { return m_Settings.FarClip; }
+	inline glm::vec3 GetPosition() const { return m_Settings.Position; }
+	inline glm::vec3 GetFront() const { return m_Settings.Front; }
+	inline glm::vec3 GetRight() const { return m_Settings.Right; }
+	inline glm::vec3 GetUp() const { return m_Settings.Up; }
+	inline float GetFov() const { return m_Settings.Fov; }
+	inline void CameraShouldUpdate(bool val) { m_UpdateCamera = val; }
+	inline void ConstrainPitch(bool enable) { m_ConstainPitch = enable; }
+	inline void Reset() { m_Settings = CameraSettings(); }
 
-	glm::mat4 GetViewMatrix()
-	{
-		return glm::lookAt(m_Settings.Position, m_Settings.Front + m_Settings.Position, m_Settings.Up);
-	}
 
-	void ProcessKeyboard(Camera_Movement direction, float deltaTime)
-	{
-		float velocity = m_Settings.MovementSpeed * deltaTime;
+	glm::mat4 GetViewMatrix() const;
 
-		if (direction == FORWARD)
-			m_Settings.Position += m_Settings.Front * velocity;
-		if (direction == BACKWARD)
-			m_Settings.Position -= m_Settings.Front * velocity;
-		if (direction == LEFT)
-			m_Settings.Position -= m_Settings.Right* velocity;
-		if (direction == RIGHT)
-			m_Settings.Position += m_Settings.Right* velocity;
-		if (direction == UPWARD)
-			m_Settings.Position += m_Settings.Up* velocity;
-		if (direction == DOWNWARD)
-			m_Settings.Position -= m_Settings.Up* velocity;
+	glm::mat4 GetProjectionMatrix() const;
 
-	}
-
-	void ProcessMouseMovement(float xoffset, float yoffset, const GLboolean constraintPitch = true)
-	{
-		xoffset *= m_Settings.MouseSensitivity;
-		yoffset *= m_Settings.MouseSensitivity;
-
-		m_Settings.Yaw += xoffset;
-		m_Settings.Pitch += yoffset;
-
-		if (constraintPitch)
-		{
-			if (m_Settings.Pitch > 89.0f)
-				m_Settings.Pitch = 89.0f;
-			else if (m_Settings.Pitch < -89.0f)
-				m_Settings.Pitch = -89.0f;
-		}
-
-		UpdateCameraVectors();
-	}
-
-	void ProcessMouseScroll(float xoffset, float yoffset)
-	{
-		m_Settings.Fov += (xoffset - yoffset);
-		m_Settings.Fov = std::fmax(m_Settings.Fov, 10.0f);
-		m_Settings.Fov = std::fmin(m_Settings.Fov, 170.0f);
-	}
-
-	void Reset()
-	{
-		m_Settings = CameraSettings();
-	}
-
+	void OnEvent(Event& e);
+	void OnUpdate(float ts);
 private:
-	void UpdateCameraVectors()
-	{
-		glm::vec3 direction;
-		direction.x = cos(glm::radians(m_Settings.Yaw)) * cos(glm::radians(m_Settings.Pitch));
-		direction.y = sin(glm::radians(m_Settings.Pitch));
-		direction.z = sin(glm::radians(m_Settings.Yaw)) * cos(glm::radians(m_Settings.Pitch));
-		m_Settings.Front = glm::normalize(direction);
-
-		m_Settings.Right = glm::normalize(glm::cross(m_Settings.Front, m_Settings.WorldUp));
-		m_Settings.Up = glm::normalize(glm::cross(m_Settings.Right, m_Settings.Front));
-	}
-public:
-	CameraSettings m_Settings;
+	bool OnKeyPressedEvent(KeyPressedEvent& e);
+	bool OnMouseMovedEvent(MouseMovedEvent& e);
+	bool OnMouseScrolledEvent(MouseScrolledEvent& e);
+	bool OnWindowResized(WindowResizeEvent& e);
+private:
+	void UpdateCameraVectors();
+private:
+	CameraSettings m_Settings = CameraSettings();
+	// TODO: do not hard code this
+	float m_ViewportWidth = 1600, m_ViewportHeight = 900;
+	bool m_FirstMouseMove = true;
+	glm::vec2 m_LastMousePos = { 0.0f, 0.0f };
+	bool m_UpdateCamera = true;
+	bool m_ConstainPitch = true;
 };
